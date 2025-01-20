@@ -24,16 +24,23 @@ interface BitbucketConfig {
   token?: string;
   username?: string;
   password?: string;
+}
+
+interface RepositoryParams {
   project: string;
   repository: string;
 }
 
-interface PullRequestInput {
+interface PullRequestInput extends RepositoryParams {
   title: string;
   description: string;
   sourceBranch: string;
   targetBranch: string;
   reviewers?: string[];
+}
+
+interface PullRequestParams extends RepositoryParams {
+  prId: number;
 }
 
 class BitbucketServer {
@@ -59,9 +66,7 @@ class BitbucketServer {
       baseUrl: process.env.BITBUCKET_URL ?? '',
       token: process.env.BITBUCKET_TOKEN,
       username: process.env.BITBUCKET_USERNAME,
-      password: process.env.BITBUCKET_PASSWORD,
-      project: process.env.BITBUCKET_PROJECT ?? '',
-      repository: process.env.BITBUCKET_REPOSITORY ?? ''
+      password: process.env.BITBUCKET_PASSWORD
     };
 
     if (!this.config.baseUrl) {
@@ -97,17 +102,19 @@ class BitbucketServer {
           inputSchema: {
             type: 'object',
             properties: {
+              project: { type: 'string', description: 'Bitbucket project key' },
+              repository: { type: 'string', description: 'Repository slug' },
               title: { type: 'string', description: 'PR title' },
               description: { type: 'string', description: 'PR description' },
               sourceBranch: { type: 'string', description: 'Source branch name' },
               targetBranch: { type: 'string', description: 'Target branch name' },
-              reviewers: { 
-                type: 'array', 
+              reviewers: {
+                type: 'array',
                 items: { type: 'string' },
                 description: 'List of reviewer usernames'
               }
             },
-            required: ['title', 'sourceBranch', 'targetBranch']
+            required: ['project', 'repository', 'title', 'sourceBranch', 'targetBranch']
           }
         },
         {
@@ -116,9 +123,11 @@ class BitbucketServer {
           inputSchema: {
             type: 'object',
             properties: {
+              project: { type: 'string', description: 'Bitbucket project key' },
+              repository: { type: 'string', description: 'Repository slug' },
               prId: { type: 'number', description: 'Pull request ID' }
             },
-            required: ['prId']
+            required: ['project', 'repository', 'prId']
           }
         },
         {
@@ -127,15 +136,17 @@ class BitbucketServer {
           inputSchema: {
             type: 'object',
             properties: {
+              project: { type: 'string', description: 'Bitbucket project key' },
+              repository: { type: 'string', description: 'Repository slug' },
               prId: { type: 'number', description: 'Pull request ID' },
               message: { type: 'string', description: 'Merge commit message' },
-              strategy: { 
-                type: 'string', 
+              strategy: {
+                type: 'string',
                 enum: ['merge-commit', 'squash', 'fast-forward'],
                 description: 'Merge strategy to use'
               }
             },
-            required: ['prId']
+            required: ['project', 'repository', 'prId']
           }
         },
         {
@@ -144,10 +155,12 @@ class BitbucketServer {
           inputSchema: {
             type: 'object',
             properties: {
+              project: { type: 'string', description: 'Bitbucket project key' },
+              repository: { type: 'string', description: 'Repository slug' },
               prId: { type: 'number', description: 'Pull request ID' },
               message: { type: 'string', description: 'Reason for declining' }
             },
-            required: ['prId']
+            required: ['project', 'repository', 'prId']
           }
         },
         {
@@ -156,11 +169,13 @@ class BitbucketServer {
           inputSchema: {
             type: 'object',
             properties: {
+              project: { type: 'string', description: 'Bitbucket project key' },
+              repository: { type: 'string', description: 'Repository slug' },
               prId: { type: 'number', description: 'Pull request ID' },
               text: { type: 'string', description: 'Comment text' },
               parentId: { type: 'number', description: 'Parent comment ID for replies' }
             },
-            required: ['prId', 'text']
+            required: ['project', 'repository', 'prId', 'text']
           }
         },
         {
@@ -169,10 +184,12 @@ class BitbucketServer {
           inputSchema: {
             type: 'object',
             properties: {
+              project: { type: 'string', description: 'Bitbucket project key' },
+              repository: { type: 'string', description: 'Repository slug' },
               prId: { type: 'number', description: 'Pull request ID' },
               contextLines: { type: 'number', description: 'Number of context lines' }
             },
-            required: ['prId']
+            required: ['project', 'repository', 'prId']
           }
         },
         {
@@ -181,9 +198,11 @@ class BitbucketServer {
           inputSchema: {
             type: 'object',
             properties: {
+              project: { type: 'string', description: 'Bitbucket project key' },
+              repository: { type: 'string', description: 'Repository slug' },
               prId: { type: 'number', description: 'Pull request ID' }
             },
-            required: ['prId']
+            required: ['project', 'repository', 'prId']
           }
         }
       ]
@@ -192,36 +211,61 @@ class BitbucketServer {
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       try {
         logger.info(`Called tool: ${request.params.name}`, { arguments: request.params.arguments });
+        const args = request.params.arguments ?? {};
+
+        const pullRequestParams: PullRequestParams = {
+          project: args.project as string,
+          repository: args.repository as string,
+          prId: args.prId as number
+        };
+
+        const isPullRequestInput = (args: any): args is PullRequestInput => {
+          return typeof args === 'object' &&
+            args !== null &&
+            typeof args.project === 'string' &&
+            typeof args.repository === 'string' &&
+            typeof args.title === 'string' &&
+            typeof args.sourceBranch === 'string' &&
+            typeof args.targetBranch === 'string' &&
+            (args.description === undefined || typeof args.description === 'string') &&
+            (args.reviewers === undefined || Array.isArray(args.reviewers));
+        };
 
         switch (request.params.name) {
           case 'create_pull_request':
-            return await this.createPullRequest(request.params.arguments as unknown as PullRequestInput);
+            if (!isPullRequestInput(args)) {
+              throw new McpError(
+                ErrorCode.InvalidParams,
+                'Invalid pull request input parameters'
+              );
+            }
+            return await this.createPullRequest(args);
           case 'get_pull_request':
-            return await this.getPullRequest(request.params.arguments?.prId as number);
+            return await this.getPullRequest(pullRequestParams);
           case 'merge_pull_request':
             return await this.mergePullRequest(
-              request.params.arguments?.prId as number,
-              request.params.arguments?.message as string,
-              request.params.arguments?.strategy as string
+              pullRequestParams,
+              args.message as string,
+              args.strategy as string
             );
           case 'decline_pull_request':
             return await this.declinePullRequest(
-              request.params.arguments?.prId as number,
-              request.params.arguments?.message as string
+              pullRequestParams,
+              args.message as string
             );
           case 'add_comment':
             return await this.addComment(
-              request.params.arguments?.prId as number,
-              request.params.arguments?.text as string,
-              request.params.arguments?.parentId as number
+              pullRequestParams,
+              args.text as string,
+              args.parentId as number
             );
           case 'get_diff':
             return await this.getDiff(
-              request.params.arguments?.prId as number,
-              request.params.arguments?.contextLines as number
+              pullRequestParams,
+              args.contextLines as number
             );
           case 'get_reviews':
-            return await this.getReviews(request.params.arguments?.prId as number);
+            return await this.getReviews(pullRequestParams);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -243,22 +287,22 @@ class BitbucketServer {
 
   private async createPullRequest(input: PullRequestInput) {
     const response = await this.api.post(
-      `/projects/${this.config.project}/repos/${this.config.repository}/pull-requests`,
+      `/projects/${input.project}/repos/${input.repository}/pull-requests`,
       {
         title: input.title,
         description: input.description,
         fromRef: {
           id: `refs/heads/${input.sourceBranch}`,
           repository: {
-            slug: this.config.repository,
-            project: { key: this.config.project }
+            slug: input.repository,
+            project: { key: input.project }
           }
         },
         toRef: {
           id: `refs/heads/${input.targetBranch}`,
           repository: {
-            slug: this.config.repository,
-            project: { key: this.config.project }
+            slug: input.repository,
+            project: { key: input.project }
           }
         },
         reviewers: input.reviewers?.map(username => ({ user: { name: username } }))
@@ -270,9 +314,9 @@ class BitbucketServer {
     };
   }
 
-  private async getPullRequest(prId: number) {
+  private async getPullRequest({ project, repository, prId }: PullRequestParams) {
     const response = await this.api.get(
-      `/projects/${this.config.project}/repos/${this.config.repository}/pull-requests/${prId}`
+      `/projects/${project}/repos/${repository}/pull-requests/${prId}`
     );
 
     return {
@@ -280,9 +324,9 @@ class BitbucketServer {
     };
   }
 
-  private async mergePullRequest(prId: number, message?: string, strategy: string = 'merge-commit') {
+  private async mergePullRequest({ project, repository, prId }: PullRequestParams, message?: string, strategy: string = 'merge-commit') {
     const response = await this.api.post(
-      `/projects/${this.config.project}/repos/${this.config.repository}/pull-requests/${prId}/merge`,
+      `/projects/${project}/repos/${repository}/pull-requests/${prId}/merge`,
       {
         version: -1,
         message: message,
@@ -295,9 +339,9 @@ class BitbucketServer {
     };
   }
 
-  private async declinePullRequest(prId: number, message?: string) {
+  private async declinePullRequest({ project, repository, prId }: PullRequestParams, message?: string) {
     const response = await this.api.post(
-      `/projects/${this.config.project}/repos/${this.config.repository}/pull-requests/${prId}/decline`,
+      `/projects/${project}/repos/${repository}/pull-requests/${prId}/decline`,
       {
         version: -1,
         message: message
@@ -309,9 +353,9 @@ class BitbucketServer {
     };
   }
 
-  private async addComment(prId: number, text: string, parentId?: number) {
+  private async addComment({ project, repository, prId }: PullRequestParams, text: string, parentId?: number) {
     const response = await this.api.post(
-      `/projects/${this.config.project}/repos/${this.config.repository}/pull-requests/${prId}/comments`,
+      `/projects/${project}/repos/${repository}/pull-requests/${prId}/comments`,
       {
         text: text,
         parent: parentId ? { id: parentId } : undefined
@@ -323,9 +367,9 @@ class BitbucketServer {
     };
   }
 
-  private async getDiff(prId: number, contextLines: number = 10) {
+  private async getDiff({ project, repository, prId }: PullRequestParams, contextLines: number = 10) {
     const response = await this.api.get(
-      `/projects/${this.config.project}/repos/${this.config.repository}/pull-requests/${prId}/diff`,
+      `/projects/${project}/repos/${repository}/pull-requests/${prId}/diff`,
       {
         params: { contextLines },
         headers: { Accept: 'text/plain' }
@@ -337,9 +381,9 @@ class BitbucketServer {
     };
   }
 
-  private async getReviews(prId: number) {
+  private async getReviews({ project, repository, prId }: PullRequestParams) {
     const response = await this.api.get(
-      `/projects/${this.config.project}/repos/${this.config.repository}/pull-requests/${prId}/activities`
+      `/projects/${project}/repos/${repository}/pull-requests/${prId}/activities`
     );
 
     const reviews = response.data.values.filter(
