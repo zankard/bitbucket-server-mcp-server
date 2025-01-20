@@ -37,14 +37,14 @@ interface PullRequestInput {
 }
 
 class BitbucketServer {
-  private server: Server;
-  private api: AxiosInstance;
-  private config: BitbucketConfig;
+  private readonly server: Server;
+  private readonly api: AxiosInstance;
+  private readonly config: BitbucketConfig;
 
   constructor() {
     this.server = new Server(
       {
-        name: 'bitbucket-server',
+        name: 'bitbucket-server-mcp-server',
         version: '1.0.0',
       },
       {
@@ -56,12 +56,12 @@ class BitbucketServer {
 
     // Configuration initiale à partir des variables d'environnement
     this.config = {
-      baseUrl: process.env.BITBUCKET_URL || '',
+      baseUrl: process.env.BITBUCKET_URL ?? '',
       token: process.env.BITBUCKET_TOKEN,
       username: process.env.BITBUCKET_USERNAME,
       password: process.env.BITBUCKET_PASSWORD,
-      project: process.env.BITBUCKET_PROJECT || '',
-      repository: process.env.BITBUCKET_REPOSITORY || ''
+      project: process.env.BITBUCKET_PROJECT ?? '',
+      repository: process.env.BITBUCKET_REPOSITORY ?? ''
     };
 
     if (!this.config.baseUrl) {
@@ -195,33 +195,33 @@ class BitbucketServer {
 
         switch (request.params.name) {
           case 'create_pull_request':
-            return await this.createPullRequest(request.params.arguments as PullRequestInput);
+            return await this.createPullRequest(request.params.arguments as unknown as PullRequestInput);
           case 'get_pull_request':
-            return await this.getPullRequest(request.params.arguments.prId);
+            return await this.getPullRequest(request.params.arguments?.prId as number);
           case 'merge_pull_request':
             return await this.mergePullRequest(
-              request.params.arguments.prId,
-              request.params.arguments.message,
-              request.params.arguments.strategy
+              request.params.arguments?.prId as number,
+              request.params.arguments?.message as string,
+              request.params.arguments?.strategy as string
             );
           case 'decline_pull_request':
             return await this.declinePullRequest(
-              request.params.arguments.prId,
-              request.params.arguments.message
+              request.params.arguments?.prId as number,
+              request.params.arguments?.message as string
             );
           case 'add_comment':
             return await this.addComment(
-              request.params.arguments.prId,
-              request.params.arguments.text,
-              request.params.arguments.parentId
+              request.params.arguments?.prId as number,
+              request.params.arguments?.text as string,
+              request.params.arguments?.parentId as number
             );
           case 'get_diff':
             return await this.getDiff(
-              request.params.arguments.prId,
-              request.params.arguments.contextLines
+              request.params.arguments?.prId as number,
+              request.params.arguments?.contextLines as number
             );
           case 'get_reviews':
-            return await this.getReviews(request.params.arguments.prId);
+            return await this.getReviews(request.params.arguments?.prId as number);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,

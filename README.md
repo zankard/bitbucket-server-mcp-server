@@ -19,27 +19,35 @@ npm run build
 The server provides the following tools for Bitbucket Server integration:
 
 ### `create_pull_request`
+
 Creates a new pull request with specified title, description, source branch, target branch, and optional reviewers.
 
 ### `get_pull_request`
+
 Retrieves detailed information about a specific pull request by its ID.
 
 ### `merge_pull_request`
+
 Merges a pull request using one of three strategies:
+
 - merge-commit (default)
 - squash
 - fast-forward
 
 ### `decline_pull_request`
+
 Declines a pull request with an optional message explaining the reason.
 
 ### `add_comment`
+
 Adds a comment to a pull request. Supports both top-level comments and replies to existing comments.
 
 ### `get_diff`
+
 Retrieves the diff for a pull request with configurable context lines.
 
 ### `get_reviews`
+
 Fetches the review history of a pull request, including approvals and reviews.
 
 ## Core Dependencies
