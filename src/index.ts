@@ -19,6 +19,11 @@ const logger = winston.createLogger({
   ]
 });
 
+interface BitbucketActivity {
+  action: string;
+  [key: string]: unknown;
+}
+
 interface BitbucketConfig {
   baseUrl: string;
   token?: string;
@@ -104,15 +109,16 @@ class BitbucketServer {
   }
 
   private isPullRequestInput(args: unknown): args is PullRequestInput {
+    const input = args as Partial<PullRequestInput>;
     return typeof args === 'object' &&
       args !== null &&
-      typeof (args as any).project === 'string' &&
-      typeof (args as any).repository === 'string' &&
-      typeof (args as any).title === 'string' &&
-      typeof (args as any).sourceBranch === 'string' &&
-      typeof (args as any).targetBranch === 'string' &&
-      ((args as any).description === undefined || typeof (args as any).description === 'string') &&
-      ((args as any).reviewers === undefined || Array.isArray((args as any).reviewers));
+      typeof input.project === 'string' &&
+      typeof input.repository === 'string' &&
+      typeof input.title === 'string' &&
+      typeof input.sourceBranch === 'string' &&
+      typeof input.targetBranch === 'string' &&
+      (input.description === undefined || typeof input.description === 'string') &&
+      (input.reviewers === undefined || Array.isArray(input.reviewers));
   }
 
   private setupToolHandlers() {
@@ -399,7 +405,7 @@ class BitbucketServer {
     );
 
     const reviews = response.data.values.filter(
-      (activity: any) => activity.action === 'APPROVED' || activity.action === 'REVIEWED'
+      (activity: BitbucketActivity) => activity.action === 'APPROVED' || activity.action === 'REVIEWED'
     );
 
     return {
