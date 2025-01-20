@@ -31,16 +31,26 @@ interface RepositoryParams {
   repository: string;
 }
 
+interface PullRequestParams extends RepositoryParams {
+  prId: number;
+}
+
+interface MergeOptions {
+  message?: string;
+  strategy?: 'merge-commit' | 'squash' | 'fast-forward';
+}
+
+interface CommentOptions {
+  text: string;
+  parentId?: number;
+}
+
 interface PullRequestInput extends RepositoryParams {
   title: string;
   description: string;
   sourceBranch: string;
   targetBranch: string;
   reviewers?: string[];
-}
-
-interface PullRequestParams extends RepositoryParams {
-  prId: number;
 }
 
 class BitbucketServer {
@@ -91,6 +101,18 @@ class BitbucketServer {
     this.setupToolHandlers();
     
     this.server.onerror = (error) => logger.error('[MCP Error]', error);
+  }
+
+  private isPullRequestInput(args: unknown): args is PullRequestInput {
+    return typeof args === 'object' &&
+      args !== null &&
+      typeof (args as any).project === 'string' &&
+      typeof (args as any).repository === 'string' &&
+      typeof (args as any).title === 'string' &&
+      typeof (args as any).sourceBranch === 'string' &&
+      typeof (args as any).targetBranch === 'string' &&
+      ((args as any).description === undefined || typeof (args as any).description === 'string') &&
+      ((args as any).reviewers === undefined || Array.isArray((args as any).reviewers));
   }
 
   private setupToolHandlers() {
@@ -219,21 +241,9 @@ class BitbucketServer {
           prId: args.prId as number
         };
 
-        const isPullRequestInput = (args: any): args is PullRequestInput => {
-          return typeof args === 'object' &&
-            args !== null &&
-            typeof args.project === 'string' &&
-            typeof args.repository === 'string' &&
-            typeof args.title === 'string' &&
-            typeof args.sourceBranch === 'string' &&
-            typeof args.targetBranch === 'string' &&
-            (args.description === undefined || typeof args.description === 'string') &&
-            (args.reviewers === undefined || Array.isArray(args.reviewers));
-        };
-
         switch (request.params.name) {
           case 'create_pull_request':
-            if (!isPullRequestInput(args)) {
+            if (!this.isPullRequestInput(args)) {
               throw new McpError(
                 ErrorCode.InvalidParams,
                 'Invalid pull request input parameters'
@@ -243,27 +253,19 @@ class BitbucketServer {
           case 'get_pull_request':
             return await this.getPullRequest(pullRequestParams);
           case 'merge_pull_request':
-            return await this.mergePullRequest(
-              pullRequestParams,
-              args.message as string,
-              args.strategy as string
-            );
+            return await this.mergePullRequest(pullRequestParams, {
+              message: args.message as string,
+              strategy: args.strategy as 'merge-commit' | 'squash' | 'fast-forward'
+            });
           case 'decline_pull_request':
-            return await this.declinePullRequest(
-              pullRequestParams,
-              args.message as string
-            );
+            return await this.declinePullRequest(pullRequestParams, args.message as string);
           case 'add_comment':
-            return await this.addComment(
-              pullRequestParams,
-              args.text as string,
-              args.parentId as number
-            );
+            return await this.addComment(pullRequestParams, {
+              text: args.text as string,
+              parentId: args.parentId as number
+            });
           case 'get_diff':
-            return await this.getDiff(
-              pullRequestParams,
-              args.contextLines as number
-            );
+            return await this.getDiff(pullRequestParams, args.contextLines as number);
           case 'get_reviews':
             return await this.getReviews(pullRequestParams);
           default:
@@ -314,7 +316,8 @@ class BitbucketServer {
     };
   }
 
-  private async getPullRequest({ project, repository, prId }: PullRequestParams) {
+  private async getPullRequest(params: PullRequestParams) {
+    const { project, repository, prId } = params;
     const response = await this.api.get(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}`
     );
@@ -324,12 +327,15 @@ class BitbucketServer {
     };
   }
 
-  private async mergePullRequest({ project, repository, prId }: PullRequestParams, message?: string, strategy: string = 'merge-commit') {
+  private async mergePullRequest(params: PullRequestParams, options: MergeOptions = {}) {
+    const { project, repository, prId } = params;
+    const { message, strategy = 'merge-commit' } = options;
+    
     const response = await this.api.post(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/merge`,
       {
         version: -1,
-        message: message,
+        message,
         strategy
       }
     );
@@ -339,12 +345,13 @@ class BitbucketServer {
     };
   }
 
-  private async declinePullRequest({ project, repository, prId }: PullRequestParams, message?: string) {
+  private async declinePullRequest(params: PullRequestParams, message?: string) {
+    const { project, repository, prId } = params;
     const response = await this.api.post(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/decline`,
       {
         version: -1,
-        message: message
+        message
       }
     );
 
@@ -353,11 +360,14 @@ class BitbucketServer {
     };
   }
 
-  private async addComment({ project, repository, prId }: PullRequestParams, text: string, parentId?: number) {
+  private async addComment(params: PullRequestParams, options: CommentOptions) {
+    const { project, repository, prId } = params;
+    const { text, parentId } = options;
+    
     const response = await this.api.post(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/comments`,
       {
-        text: text,
+        text,
         parent: parentId ? { id: parentId } : undefined
       }
     );
@@ -367,7 +377,8 @@ class BitbucketServer {
     };
   }
 
-  private async getDiff({ project, repository, prId }: PullRequestParams, contextLines: number = 10) {
+  private async getDiff(params: PullRequestParams, contextLines: number = 10) {
+    const { project, repository, prId } = params;
     const response = await this.api.get(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/diff`,
       {
@@ -381,7 +392,8 @@ class BitbucketServer {
     };
   }
 
-  private async getReviews({ project, repository, prId }: PullRequestParams) {
+  private async getReviews(params: PullRequestParams) {
+    const { project, repository, prId } = params;
     const response = await this.api.get(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/activities`
     );
