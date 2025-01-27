@@ -2,6 +2,7 @@
 
 MCP (Model Context Protocol) server for Bitbucket Server Pull Request management. This server provides tools and resources to interact with the Bitbucket Server API through the MCP protocol.
 
+[![smithery badge](https://smithery.ai/badge/@garc33/bitbucket-server-mcp-server)](https://smithery.ai/server/@garc33/bitbucket-server-mcp-server)
 <a href="https://glama.ai/mcp/servers/jskr5c1zq3"><img width="380" height="200" src="https://glama.ai/mcp/servers/jskr5c1zq3/badge" alt="Bitbucket Server MCP server" /></a>
 
 ## Requirements
@@ -10,6 +11,15 @@ MCP (Model Context Protocol) server for Bitbucket Server Pull Request management
 
 ## Installation
 
+### Installing via Smithery
+
+To install Bitbucket Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@garc33/bitbucket-server-mcp-server):
+
+```bash
+npx -y @smithery/cli install @garc33/bitbucket-server-mcp-server --client claude
+```
+
+### Manual Installation
 ```bash
 npm install
 ```
