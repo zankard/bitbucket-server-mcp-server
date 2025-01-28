@@ -1,4 +1,4 @@
-// Mock des dépendances
+// Mock dependencies
 jest.mock('@modelcontextprotocol/sdk/server/index.js');
 jest.mock('axios');
 
@@ -7,8 +7,7 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import axios, { AxiosInstance } from 'axios';
 
 
-
-// Types pour le SDK MCP
+// MCP SDK Types
 type ToolResponse = {
   content: Array<{
     type: string;
@@ -26,35 +25,35 @@ type RequestExtra = {
   signal: AbortSignal;
 };
 
-// Mock de la classe Server
+// Mock Server class
 const MockServer = Server as jest.MockedClass<typeof Server>;
 
-// Import du code à tester après les mocks
+// Import code to test after mocks
 import '../index';
 
 describe('BitbucketServer', () => {
-  // Variables pour les mocks
+  // Mock variables
   let mockAxios: jest.Mocked<typeof axios>;
   let originalEnv: NodeJS.ProcessEnv;
   let mockServer: jest.Mocked<Server>;
   let mockAbortController: AbortController;
 
   beforeEach(() => {
-    // Sauvegarde des variables d'environnement
+    // Save environment variables
     originalEnv = process.env;
     process.env = {
       BITBUCKET_URL: 'https://bitbucket.example.com',
       BITBUCKET_TOKEN: 'test-token'
     };
 
-    // Reset des mocks
+    // Reset mocks
     jest.clearAllMocks();
     
-    // Configuration du mock axios
+    // Configure axios mock
     mockAxios = axios as jest.Mocked<typeof axios>;
     mockAxios.create.mockReturnValue({} as AxiosInstance);
 
-    // Configuration du mock Server
+    // Configure Server mock
     mockServer = {
       setRequestHandler: jest.fn(),
       connect: jest.fn(),
@@ -64,17 +63,17 @@ describe('BitbucketServer', () => {
     
     MockServer.mockImplementation(() => mockServer);
 
-    // Configuration du AbortController pour le signal
+    // Configure AbortController for signal
     mockAbortController = new AbortController();
   });
 
   afterEach(() => {
-    // Restauration des variables d'environnement
+    // Restore environment variables
     process.env = originalEnv;
   });
 
   describe('Configuration', () => {
-    test('devrait throw si BITBUCKET_URL n\'est pas défini', () => {
+    test('should throw if BITBUCKET_URL is not defined', () => {
       // Arrange
       process.env.BITBUCKET_URL = '';
 
@@ -84,7 +83,7 @@ describe('BitbucketServer', () => {
       }).toThrow('BITBUCKET_URL is required');
     });
 
-    test('devrait throw si ni token ni credentials ne sont fournis', () => {
+    test('should throw if neither token nor credentials are provided', () => {
       // Arrange
       process.env = {
         BITBUCKET_URL: 'https://bitbucket.example.com'
@@ -96,7 +95,7 @@ describe('BitbucketServer', () => {
       }).toThrow('Either BITBUCKET_TOKEN or BITBUCKET_USERNAME/PASSWORD is required');
     });
 
-    test('devrait configurer axios avec le token', () => {
+    test('should configure axios with token', () => {
       // Arrange
       const expectedConfig = {
         baseURL: 'https://bitbucket.example.com/rest/api/1.0',
@@ -132,7 +131,7 @@ describe('BitbucketServer', () => {
       return callHandler(request, extra) as Promise<ToolResponse>;
     };
 
-    test('devrait créer un pull request', async () => {
+    test('should create a pull request', async () => {
       // Arrange
       const input = {
         project: 'TEST',
@@ -163,7 +162,7 @@ describe('BitbucketServer', () => {
       expect(JSON.parse(result.content[0].text)).toEqual({ id: 1 });
     });
 
-    test('devrait merger un pull request', async () => {
+    test('should merge a pull request', async () => {
       // Arrange
       const input = {
         project: 'TEST',
@@ -190,7 +189,7 @@ describe('BitbucketServer', () => {
       expect(JSON.parse(result.content[0].text)).toEqual({ state: 'MERGED' });
     });
 
-    test('devrait gérer les erreurs API', async () => {
+    test('should handle API errors', async () => {
       // Arrange
       const input = {
         project: 'TEST',
@@ -217,7 +216,7 @@ describe('BitbucketServer', () => {
     });
   });
 
-  describe('Reviews et Commentaires', () => {
+  describe('Reviews and Comments', () => {
     const mockHandleRequest = async <T>(toolName: string, args: T): Promise<ToolResponse> => {
       const handlers = mockServer.setRequestHandler.mock.calls;
       const callHandler = handlers.find(([schema]) => 
@@ -238,7 +237,7 @@ describe('BitbucketServer', () => {
       return callHandler(request, extra) as Promise<ToolResponse>;
     };
 
-    test('devrait filtrer les activités de review', async () => {
+    test('should filter review activities', async () => {
       // Arrange
       const input = {
         project: 'TEST',
@@ -267,7 +266,7 @@ describe('BitbucketServer', () => {
       )).toBe(true);
     });
 
-    test('devrait ajouter un commentaire avec parent', async () => {
+    test('should add comment with parent', async () => {
       // Arrange
       const input = {
         project: 'TEST',
