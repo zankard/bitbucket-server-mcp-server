@@ -40,7 +40,7 @@ Creates a new pull request.
 
 Parameters:
 
-- `project` (required): Bitbucket project key
+- `project`: Bitbucket project key (defaults to BITBUCKET_DEFAULT_PROJECT if set)
 - `repository` (required): Repository slug
 - `title` (required): PR title
 - `description`: PR description
@@ -54,7 +54,7 @@ Retrieves detailed information about a specific pull request.
 
 Parameters:
 
-- `project` (required): Bitbucket project key
+- `project`: Bitbucket project key (defaults to BITBUCKET_DEFAULT_PROJECT if set)
 - `repository` (required): Repository slug
 - `prId` (required): Pull request ID
 
@@ -64,7 +64,7 @@ Merges a pull request.
 
 Parameters:
 
-- `project` (required): Bitbucket project key
+- `project`: Bitbucket project key (defaults to BITBUCKET_DEFAULT_PROJECT if set)
 - `repository` (required): Repository slug
 - `prId` (required): Pull request ID
 - `message`: Merge commit message
@@ -79,7 +79,7 @@ Declines a pull request.
 
 Parameters:
 
-- `project` (required): Bitbucket project key
+- `project`: Bitbucket project key (defaults to BITBUCKET_DEFAULT_PROJECT if set)
 - `repository` (required): Repository slug
 - `prId` (required): Pull request ID
 - `message`: Reason for declining
@@ -90,7 +90,7 @@ Adds a comment to a pull request.
 
 Parameters:
 
-- `project` (required): Bitbucket project key
+- `project`: Bitbucket project key (defaults to BITBUCKET_DEFAULT_PROJECT if set)
 - `repository` (required): Repository slug
 - `prId` (required): Pull request ID
 - `text` (required): Comment text
@@ -102,7 +102,7 @@ Retrieves the diff for a pull request.
 
 Parameters:
 
-- `project` (required): Bitbucket project key
+- `project`: Bitbucket project key (defaults to BITBUCKET_DEFAULT_PROJECT if set)
 - `repository` (required): Repository slug
 - `prId` (required): Pull request ID
 - `contextLines`: Number of context lines (default: 10)
@@ -113,7 +113,7 @@ Fetches the review history of a pull request, including approvals and reviews.
 
 Parameters:
 
-- `project` (required): Bitbucket project key
+- `project`: Bitbucket project key (defaults to BITBUCKET_DEFAULT_PROJECT if set)
 - `repository` (required): Repository slug
 - `prId` (required): Pull request ID
 
@@ -140,7 +140,9 @@ The server requires configuration in the VSCode MCP settings file. Here's a samp
         "BITBUCKET_TOKEN": "your-access-token",
         // Option 2: Username/Password
         "BITBUCKET_USERNAME": "your-username",
-        "BITBUCKET_PASSWORD": "your-password"
+        "BITBUCKET_PASSWORD": "your-password",
+        // Optional: Default project
+        "BITBUCKET_DEFAULT_PROJECT": "your-default-project"
       }
     }
   }
@@ -153,6 +155,7 @@ The server requires configuration in the VSCode MCP settings file. Here's a samp
 - Authentication (one of the following is required):
   - `BITBUCKET_TOKEN`: Personal access token
   - `BITBUCKET_USERNAME` and `BITBUCKET_PASSWORD`: Basic authentication credentials
+- `BITBUCKET_DEFAULT_PROJECT`: Default project key to use when not specified in tool calls
 
 ## Logging
 

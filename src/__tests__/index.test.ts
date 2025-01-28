@@ -43,7 +43,8 @@ describe('BitbucketServer', () => {
     originalEnv = process.env;
     process.env = {
       BITBUCKET_URL: 'https://bitbucket.example.com',
-      BITBUCKET_TOKEN: 'test-token'
+      BITBUCKET_TOKEN: 'test-token',
+      BITBUCKET_DEFAULT_PROJECT: 'DEFAULT'
     };
 
     // Reset mocks
@@ -95,7 +96,7 @@ describe('BitbucketServer', () => {
       }).toThrow('Either BITBUCKET_TOKEN or BITBUCKET_USERNAME/PASSWORD is required');
     });
 
-    test('should configure axios with token', () => {
+    test('should configure axios with token and read default project', () => {
       // Arrange
       const expectedConfig = {
         baseURL: 'https://bitbucket.example.com/rest/api/1.0',
@@ -131,7 +132,7 @@ describe('BitbucketServer', () => {
       return callHandler(request, extra) as Promise<ToolResponse>;
     };
 
-    test('should create a pull request', async () => {
+    test('should create a pull request with explicit project', async () => {
       // Arrange
       const input = {
         project: 'TEST',
@@ -160,6 +161,54 @@ describe('BitbucketServer', () => {
         })
       );
       expect(JSON.parse(result.content[0].text)).toEqual({ id: 1 });
+    });
+
+    test('should create a pull request using default project', async () => {
+      // Arrange
+      const input = {
+        repository: 'repo',
+        title: 'Test PR',
+        description: 'Test description',
+        sourceBranch: 'feature',
+        targetBranch: 'main',
+        reviewers: ['user1']
+      };
+
+      mockAxios.post.mockResolvedValueOnce({ data: { id: 1 } });
+
+      // Act
+      const result = await mockHandleRequest('create_pull_request', input);
+
+      // Assert
+      expect(mockAxios.post).toHaveBeenCalledWith(
+        '/projects/DEFAULT/repos/repo/pull-requests',
+        expect.objectContaining({
+          title: input.title,
+          description: input.description,
+          fromRef: expect.any(Object),
+          toRef: expect.any(Object),
+          reviewers: [{ user: { name: 'user1' } }]
+        })
+      );
+      expect(JSON.parse(result.content[0].text)).toEqual({ id: 1 });
+    });
+
+    test('should throw error when no project is provided or defaulted', async () => {
+      // Arrange
+      delete process.env.BITBUCKET_DEFAULT_PROJECT;
+      const input = {
+        repository: 'repo',
+        title: 'Test PR',
+        sourceBranch: 'feature',
+        targetBranch: 'main'
+      };
+
+      // Act & Assert
+      await expect(mockHandleRequest('create_pull_request', input))
+        .rejects.toThrow(new McpError(
+          ErrorCode.InvalidParams,
+          'Project must be provided either as a parameter or through BITBUCKET_DEFAULT_PROJECT environment variable'
+        ));
     });
 
     test('should merge a pull request', async () => {

@@ -29,6 +29,7 @@ interface BitbucketConfig {
   token?: string;
   username?: string;
   password?: string;
+  defaultProject?: string;
 }
 
 interface RepositoryParams {
@@ -81,7 +82,8 @@ class BitbucketServer {
       baseUrl: process.env.BITBUCKET_URL ?? '',
       token: process.env.BITBUCKET_TOKEN,
       username: process.env.BITBUCKET_USERNAME,
-      password: process.env.BITBUCKET_PASSWORD
+      password: process.env.BITBUCKET_PASSWORD,
+      defaultProject: process.env.BITBUCKET_DEFAULT_PROJECT
     };
 
     if (!this.config.baseUrl) {
@@ -142,7 +144,7 @@ class BitbucketServer {
                 description: 'List of reviewer usernames'
               }
             },
-            required: ['project', 'repository', 'title', 'sourceBranch', 'targetBranch']
+            required: ['repository', 'title', 'sourceBranch', 'targetBranch']
           }
         },
         {
@@ -155,7 +157,7 @@ class BitbucketServer {
               repository: { type: 'string', description: 'Repository slug' },
               prId: { type: 'number', description: 'Pull request ID' }
             },
-            required: ['project', 'repository', 'prId']
+            required: ['repository', 'prId']
           }
         },
         {
@@ -174,7 +176,7 @@ class BitbucketServer {
                 description: 'Merge strategy to use'
               }
             },
-            required: ['project', 'repository', 'prId']
+            required: ['repository', 'prId']
           }
         },
         {
@@ -188,7 +190,7 @@ class BitbucketServer {
               prId: { type: 'number', description: 'Pull request ID' },
               message: { type: 'string', description: 'Reason for declining' }
             },
-            required: ['project', 'repository', 'prId']
+            required: ['repository', 'prId']
           }
         },
         {
@@ -203,7 +205,7 @@ class BitbucketServer {
               text: { type: 'string', description: 'Comment text' },
               parentId: { type: 'number', description: 'Parent comment ID for replies' }
             },
-            required: ['project', 'repository', 'prId', 'text']
+            required: ['repository', 'prId', 'text']
           }
         },
         {
@@ -217,7 +219,7 @@ class BitbucketServer {
               prId: { type: 'number', description: 'Pull request ID' },
               contextLines: { type: 'number', description: 'Number of context lines' }
             },
-            required: ['project', 'repository', 'prId']
+            required: ['repository', 'prId']
           }
         },
         {
@@ -230,7 +232,7 @@ class BitbucketServer {
               repository: { type: 'string', description: 'Repository slug' },
               prId: { type: 'number', description: 'Pull request ID' }
             },
-            required: ['project', 'repository', 'prId']
+            required: ['repository', 'prId']
           }
         }
       ]
@@ -242,10 +244,17 @@ class BitbucketServer {
         const args = request.params.arguments ?? {};
 
         const pullRequestParams: PullRequestParams = {
-          project: args.project as string,
+          project: (args.project as string) ?? this.config.defaultProject,
           repository: args.repository as string,
           prId: args.prId as number
         };
+
+        if (!pullRequestParams.project) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            'Project must be provided either as a parameter or through BITBUCKET_DEFAULT_PROJECT environment variable'
+          );
+        }
 
         switch (request.params.name) {
           case 'create_pull_request':
