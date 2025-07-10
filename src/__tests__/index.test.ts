@@ -152,12 +152,13 @@ describe('Bitbucket Server MCP', () => {
       // Call the handler
       const result = await listToolsHandler();
       
-      expect(result.tools).toHaveLength(9);
+      expect(result.tools).toHaveLength(10);
       
       const toolNames = result.tools.map((tool: any) => tool.name);
       expect(toolNames).toEqual([
         'list_projects',
-        'list_repositories', 
+        'list_repositories',
+        'list_pull_requests',
         'create_pull_request',
         'get_pull_request',
         'merge_pull_request',
@@ -275,6 +276,154 @@ describe('Bitbucket Server MCP', () => {
         expect(mockAxiosInstance.get).toHaveBeenCalledWith('/projects/TEST/repos', {
           params: { limit: 25, start: 0 }
         });
+      });
+    });
+
+    describe('list_pull_requests', () => {
+      test('should list open pull requests', async () => {
+        const mockPRs = {
+          values: [
+            {
+              id: 123,
+              title: 'Feature: New functionality',
+              description: 'Adding new features',
+              state: 'OPEN',
+              open: true,
+              closed: false,
+              createdDate: 1640995200000,
+              updatedDate: 1640995300000,
+              fromRef: { displayId: 'feature/new-feature' },
+              toRef: { displayId: 'main' },
+              author: {
+                user: { name: 'user1', displayName: 'User One' }
+              },
+              reviewers: [
+                {
+                  user: { name: 'reviewer1', displayName: 'Reviewer One' },
+                  approved: false,
+                  status: 'UNAPPROVED'
+                }
+              ],
+              participants: [],
+              links: { self: [{ href: 'https://bitbucket.example.com/projects/TEST/repos/repo1/pull-requests/123' }] }
+            }
+          ],
+          size: 1
+        };
+        
+        mockAxiosInstance.get.mockResolvedValueOnce({ data: mockPRs });
+
+        const result = await callToolHandler({
+          params: {
+            name: 'list_pull_requests',
+            arguments: {
+              project: 'TEST',
+              repository: 'repo1',
+              state: 'OPEN',
+              limit: 25,
+              start: 0
+            }
+          }
+        });
+
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+          '/projects/TEST/repos/repo1/pull-requests',
+          {
+            params: {
+              limit: 25,
+              start: 0,
+              order: 'NEWEST',
+              state: 'OPEN'
+            }
+          }
+        );
+        
+        const responseData = JSON.parse(result.content[0].text);
+        expect(responseData.project).toBe('TEST');
+        expect(responseData.repository).toBe('repo1');
+        expect(responseData.total).toBe(1);
+        expect(responseData.pullRequests).toHaveLength(1);
+        expect(responseData.pullRequests[0].id).toBe(123);
+        expect(responseData.pullRequests[0].state).toBe('OPEN');
+        expect(responseData.pullRequests[0].author.username).toBe('user1');
+      });
+
+      test('should list pull requests with role filter', async () => {
+        const mockPRs = {
+          values: [
+            {
+              id: 124,
+              title: 'Bugfix: Critical issue',
+              state: 'OPEN',
+              open: true,
+              closed: false,
+              createdDate: 1640995200000,
+              updatedDate: 1640995300000,
+              fromRef: { displayId: 'bugfix/critical' },
+              toRef: { displayId: 'main' },
+              author: {
+                user: { name: 'author1', displayName: 'Author One' }
+              },
+              reviewers: [],
+              participants: [],
+              links: { self: [{ href: 'https://bitbucket.example.com/projects/TEST/repos/repo1/pull-requests/124' }] }
+            }
+          ],
+          size: 1
+        };
+        
+        mockAxiosInstance.get.mockResolvedValueOnce({ data: mockPRs });
+
+        const result = await callToolHandler({
+          params: {
+            name: 'list_pull_requests',
+            arguments: {
+              project: 'TEST',
+              repository: 'repo1',
+              role: 'AUTHOR'
+            }
+          }
+        });
+
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+          '/projects/TEST/repos/repo1/pull-requests',
+          {
+            params: {
+              limit: 25,
+              start: 0,
+              order: 'NEWEST',
+              role: 'AUTHOR'
+            }
+          }
+        );
+        
+        const responseData = JSON.parse(result.content[0].text);
+        expect(responseData.filters.role).toBe('AUTHOR');
+      });
+
+      test('should use default project when not specified', async () => {
+        const mockPRs = { values: [], size: 0 };
+        mockAxiosInstance.get.mockResolvedValueOnce({ data: mockPRs });
+
+        const result = await callToolHandler({
+          params: {
+            name: 'list_pull_requests',
+            arguments: {
+              repository: 'repo1'
+            }
+          }
+        });
+
+        expect(mockAxiosInstance.get).toHaveBeenCalledWith(
+          '/projects/TEST/repos/repo1/pull-requests',
+          expect.objectContaining({
+            params: expect.objectContaining({
+              limit: 25,
+              start: 0,
+              order: 'NEWEST'
+            })
+          })
+        );
       });
     });
 

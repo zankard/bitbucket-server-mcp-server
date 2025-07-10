@@ -79,6 +79,14 @@ interface ListRepositoriesOptions extends ListOptions {
   project?: string;
 }
 
+interface ListPullRequestsOptions extends ListOptions {
+  project?: string;
+  repository: string;
+  state?: 'OPEN' | 'DECLINED' | 'MERGED';
+  role?: 'REVIEWER' | 'AUTHOR' | 'PARTICIPANT';
+  order?: 'NEWEST' | 'OLDEST' | 'PARTICIPANT_STATUS' | 'CLOSED_DATE';
+}
+
 class BitbucketServer {
   private readonly server: Server;
   private readonly api: AxiosInstance;
@@ -167,6 +175,23 @@ class BitbucketServer {
               limit: { type: 'number', description: 'Number of repositories to return (default: 25, max: 1000)' },
               start: { type: 'number', description: 'Start index for pagination (default: 0)' }
             }
+          }
+        },
+        {
+          name: 'list_pull_requests',
+          description: 'List pull requests for a repository with filtering and pagination. Use this to browse open, closed, or all pull requests, filter by your role (author, reviewer, participant), and monitor PR status across repositories.',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              project: { type: 'string', description: 'Bitbucket project key. If omitted, uses BITBUCKET_DEFAULT_PROJECT environment variable.' },
+              repository: { type: 'string', description: 'Repository slug to list pull requests from. Use list_repositories to find available repositories.' },
+              state: { type: 'string', enum: ['OPEN', 'DECLINED', 'MERGED'], description: 'Filter by pull request state. Omit to return PRs in any state.' },
+              role: { type: 'string', enum: ['REVIEWER', 'AUTHOR', 'PARTICIPANT'], description: 'Filter by your role in the pull request.' },
+              order: { type: 'string', enum: ['NEWEST', 'OLDEST', 'PARTICIPANT_STATUS', 'CLOSED_DATE'], description: 'Sort order for results (default: NEWEST).' },
+              limit: { type: 'number', description: 'Number of pull requests to return (default: 25, max: 1000)' },
+              start: { type: 'number', description: 'Start index for pagination (default: 0)' }
+            },
+            required: ['repository']
           }
         },
         {
@@ -316,6 +341,18 @@ class BitbucketServer {
           case 'list_repositories': {
             return await this.listRepositories({
               project: args.project as string,
+              limit: args.limit as number,
+              start: args.start as number
+            });
+          }
+
+          case 'list_pull_requests': {
+            return await this.listPullRequests({
+              project: getProject(args.project as string),
+              repository: args.repository as string,
+              state: args.state as 'OPEN' | 'DECLINED' | 'MERGED',
+              role: args.role as 'REVIEWER' | 'AUTHOR' | 'PARTICIPANT',
+              order: args.order as 'NEWEST' | 'OLDEST' | 'PARTICIPANT_STATUS' | 'CLOSED_DATE',
               limit: args.limit as number,
               start: args.start as number
             });
@@ -504,6 +541,93 @@ class BitbucketServer {
         public: repo.public,
         cloneUrl: repo.links?.clone?.find((link: { name: string; href: string }) => link.name === 'http')?.href,
         state: repo.state
+      }))
+    };
+
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify(summary, null, 2)
+      }]
+    };
+  }
+
+  private async listPullRequests(options: ListPullRequestsOptions) {
+    const { project, repository, state, role, order = 'NEWEST', limit = 25, start = 0 } = options;
+
+    if (!project || !repository) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Project and repository are required'
+      );
+    }
+
+    const params: any = { limit, start, order };
+    
+    // Add optional filters
+    if (state) params.state = state;
+    if (role) params.role = role;
+
+    const response = await this.api.get(
+      `/projects/${project}/repos/${repository}/pull-requests`,
+      { params }
+    );
+
+    const pullRequests = response.data.values || [];
+    const summary = {
+      project,
+      repository,
+      filters: {
+        state,
+        role,
+        order
+      },
+      total: response.data.size || pullRequests.length,
+      showing: pullRequests.length,
+      pullRequests: pullRequests.map((pr: {
+        id: number;
+        title: string;
+        description?: string;
+        state: string;
+        open: boolean;
+        closed: boolean;
+        createdDate: number;
+        updatedDate: number;
+        fromRef: { displayId: string; repository: { name: string } };
+        toRef: { displayId: string; repository: { name: string } };
+        author: { user: { name: string; displayName: string } };
+        reviewers?: { user: { name: string; displayName: string }; approved: boolean; status: string }[];
+        participants?: { user: { name: string; displayName: string }; role: string; approved: boolean; status: string }[];
+        links?: { self: { href: string }[] };
+      }) => ({
+        id: pr.id,
+        title: pr.title,
+        description: pr.description,
+        state: pr.state,
+        open: pr.open,
+        closed: pr.closed,
+        createdDate: new Date(pr.createdDate).toISOString(),
+        updatedDate: new Date(pr.updatedDate).toISOString(),
+        author: {
+          username: pr.author.user.name,
+          displayName: pr.author.user.displayName
+        },
+        fromBranch: pr.fromRef.displayId,
+        toBranch: pr.toRef.displayId,
+        reviewers: pr.reviewers?.map(reviewer => ({
+          username: reviewer.user.name,
+          displayName: reviewer.user.displayName,
+          approved: reviewer.approved,
+          status: reviewer.status
+        })) || [],
+        participants: pr.participants?.map(participant => ({
+          username: participant.user.name,
+          displayName: participant.user.displayName,
+          role: participant.role,
+          approved: participant.approved,
+          status: participant.status
+        })) || [],
+        url: pr.links?.self?.[0]?.href
       }))
     };
 

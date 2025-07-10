@@ -39,16 +39,17 @@ This is a **Bitbucket Server MCP (Model Context Protocol) server** that provides
 - Optional default project: `BITBUCKET_DEFAULT_PROJECT`
 
 #### MCP Tools Implementation
-The server exposes 8 main tools:
+The server exposes 10 main tools:
 1. `list_projects` - Project discovery
 2. `list_repositories` - Repository browsing
-3. `create_pull_request` - PR creation
-4. `get_pull_request` - PR details retrieval
-5. `merge_pull_request` - PR merging with strategy selection
-6. `decline_pull_request` - PR rejection
-7. `add_comment` - PR commenting (supports both general and file line comments)
-8. `get_diff` - Code difference retrieval
-9. `get_reviews` - Review status checking
+3. `list_pull_requests` - PR listing with filtering and pagination
+4. `create_pull_request` - PR creation
+5. `get_pull_request` - PR details retrieval
+6. `merge_pull_request` - PR merging with strategy selection
+7. `decline_pull_request` - PR rejection
+8. `add_comment` - PR commenting (supports both general and file line comments)
+9. `get_diff` - Code difference retrieval
+10. `get_reviews` - Review status checking
 
 #### Project Parameter Handling
 - All tools support optional `project` parameter

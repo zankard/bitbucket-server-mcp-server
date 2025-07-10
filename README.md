@@ -73,6 +73,28 @@ Parameters:
 - `limit`: Number of repositories to return (default: 25, max: 1000)
 - `start`: Start index for pagination (default: 0)
 
+### `list_pull_requests`
+
+**Browse and monitor pull requests**: Lists pull requests for a repository with comprehensive filtering and pagination options. Essential for reviewing PR status, managing workflows, and monitoring team collaboration.
+
+**Use cases:**
+- Browse open pull requests requiring review
+- Monitor your authored or assigned pull requests
+- Filter PRs by approval status or role
+- Track closed or merged pull requests
+- Review team collaboration activity
+- Find PRs needing attention or approval
+
+Parameters:
+
+- `project`: Bitbucket project key (optional, uses BITBUCKET_DEFAULT_PROJECT if not provided)
+- `repository` (required): Repository slug to list pull requests from
+- `state`: Filter by PR state (`OPEN`, `DECLINED`, `MERGED`) - omit for all states
+- `role`: Filter by your role (`REVIEWER`, `AUTHOR`, `PARTICIPANT`)
+- `order`: Sort order (`NEWEST`, `OLDEST`, `PARTICIPANT_STATUS`, `CLOSED_DATE`) - default: `NEWEST`
+- `limit`: Number of pull requests to return (default: 25, max: 1000)
+- `start`: Start index for pagination (default: 0)
+
 ### `create_pull_request`
 
 **Propose code changes for review**: Creates a new pull request to submit code changes, request reviews, or merge feature branches. Automatically handles branch references and reviewer assignments.
@@ -222,6 +244,28 @@ list_repositories --project "MYPROJECT"
 
 # List projects with pagination
 list_projects --limit 10 --start 0
+
+# List repositories with pagination
+list_repositories --project "MYPROJECT" --limit 50 --start 0
+```
+
+### Browsing Pull Requests
+
+```bash
+# List all open pull requests in a repository
+list_pull_requests --repository "my-repo" --state "OPEN"
+
+# List pull requests where you are the author
+list_pull_requests --repository "my-repo" --role "AUTHOR"
+
+# List pull requests needing your review
+list_pull_requests --repository "my-repo" --role "REVIEWER"
+
+# List recently merged pull requests
+list_pull_requests --repository "my-repo" --state "MERGED" --order "CLOSED_DATE" --limit 10
+
+# List all pull requests with pagination
+list_pull_requests --repository "my-repo" --limit 50 --start 0
 ```
 
 ### Working with Pull Requests
