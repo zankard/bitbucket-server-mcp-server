@@ -15,7 +15,6 @@ const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
   transports: [
-    new winston.transports.File({ filename: 'bitbucket.log' })
   ]
 });
 
@@ -106,7 +105,7 @@ class BitbucketServer {
     // Configuration de l'instance Axios
     this.api = axios.create({
       baseURL: `${this.config.baseUrl}/rest/api/1.0`,
-      headers: this.config.token 
+      headers: this.config.token
         ? { Authorization: `Bearer ${this.config.token}` }
         : {},
       auth: this.config.username && this.config.password
@@ -115,7 +114,7 @@ class BitbucketServer {
     });
 
     this.setupToolHandlers();
-    
+
     this.server.onerror = (error) => logger.error('[MCP Error]', error);
   }
 
@@ -414,16 +413,16 @@ class BitbucketServer {
     };
 
     return {
-      content: [{ 
-        type: 'text', 
-        text: JSON.stringify(summary, null, 2) 
+      content: [{
+        type: 'text',
+        text: JSON.stringify(summary, null, 2)
       }]
     };
   }
 
   private async listRepositories(options: ListRepositoriesOptions = {}) {
     const { project, limit = 25, start = 0 } = options;
-    
+
     let endpoint: string;
     const params = { limit, start };
 
@@ -443,14 +442,14 @@ class BitbucketServer {
       project: project || this.config.defaultProject || 'all',
       total: response.data.size || repositories.length,
       showing: repositories.length,
-      repositories: repositories.map((repo: { 
-        slug: string; 
-        name: string; 
-        description?: string; 
-        project?: { key: string }; 
-        public: boolean; 
-        links?: { clone?: { name: string; href: string }[] }; 
-        state: string 
+      repositories: repositories.map((repo: {
+        slug: string;
+        name: string;
+        description?: string;
+        project?: { key: string };
+        public: boolean;
+        links?: { clone?: { name: string; href: string }[] };
+        state: string
       }) => ({
         slug: repo.slug,
         name: repo.name,
@@ -463,9 +462,9 @@ class BitbucketServer {
     };
 
     return {
-      content: [{ 
-        type: 'text', 
-        text: JSON.stringify(summary, null, 2) 
+      content: [{
+        type: 'text',
+        text: JSON.stringify(summary, null, 2)
       }]
     };
   }
@@ -501,14 +500,14 @@ class BitbucketServer {
 
   private async getPullRequest(params: PullRequestParams) {
     const { project, repository, prId } = params;
-    
+
     if (!project || !repository || !prId) {
       throw new McpError(
         ErrorCode.InvalidParams,
         'Project, repository, and prId are required'
       );
     }
-    
+
     const response = await this.api.get(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}`
     );
@@ -520,16 +519,16 @@ class BitbucketServer {
 
   private async mergePullRequest(params: PullRequestParams, options: MergeOptions = {}) {
     const { project, repository, prId } = params;
-    
+
     if (!project || !repository || !prId) {
       throw new McpError(
         ErrorCode.InvalidParams,
         'Project, repository, and prId are required'
       );
     }
-    
+
     const { message, strategy = 'merge-commit' } = options;
-    
+
     const response = await this.api.post(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/merge`,
       {
@@ -546,14 +545,14 @@ class BitbucketServer {
 
   private async declinePullRequest(params: PullRequestParams, message?: string) {
     const { project, repository, prId } = params;
-    
+
     if (!project || !repository || !prId) {
       throw new McpError(
         ErrorCode.InvalidParams,
         'Project, repository, and prId are required'
       );
     }
-    
+
     const response = await this.api.post(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/decline`,
       {
@@ -569,16 +568,16 @@ class BitbucketServer {
 
   private async addComment(params: PullRequestParams, options: CommentOptions) {
     const { project, repository, prId } = params;
-    
+
     if (!project || !repository || !prId) {
       throw new McpError(
         ErrorCode.InvalidParams,
         'Project, repository, and prId are required'
       );
     }
-    
+
     const { text, parentId } = options;
-    
+
     const response = await this.api.post(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/comments`,
       {
@@ -594,14 +593,14 @@ class BitbucketServer {
 
   private async getDiff(params: PullRequestParams, contextLines: number = 10) {
     const { project, repository, prId } = params;
-    
+
     if (!project || !repository || !prId) {
       throw new McpError(
         ErrorCode.InvalidParams,
         'Project, repository, and prId are required'
       );
     }
-    
+
     const response = await this.api.get(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/diff`,
       {
@@ -617,14 +616,14 @@ class BitbucketServer {
 
   private async getReviews(params: PullRequestParams) {
     const { project, repository, prId } = params;
-    
+
     if (!project || !repository || !prId) {
       throw new McpError(
         ErrorCode.InvalidParams,
         'Project, repository, and prId are required'
       );
     }
-    
+
     const response = await this.api.get(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/activities`
     );
