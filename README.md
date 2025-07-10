@@ -149,7 +149,7 @@ Parameters:
 
 ### `add_comment`
 
-**Participate in code review**: Adds comments to pull requests for review feedback, discussions, and collaboration. Supports threaded conversations.
+**Participate in code review**: Adds comments to pull requests for review feedback, discussions, and collaboration. Supports both general pull request comments and file line comments. Enables threaded conversations and inline file comments.
 
 **Use cases:**
 - Provide code review feedback
@@ -157,6 +157,8 @@ Parameters:
 - Suggest improvements
 - Participate in technical discussions
 - Document review decisions
+- Add inline comments on specific lines of code
+- Comment on file changes in context
 
 Parameters:
 
@@ -165,6 +167,15 @@ Parameters:
 - `prId` (required): Pull request ID
 - `text` (required): Comment content (supports Markdown)
 - `parentId`: Parent comment ID for threaded replies
+
+**File Line Comment Parameters (optional, for inline comments):**
+- `filePath`: File path for inline file comments
+- `lineNumber`: Line number for inline file comments (required when filePath is provided)
+- `lineType`: Type of line (`CONTEXT`, `ADDED`, `REMOVED`) - defaults to `CONTEXT`
+- `fileType`: Whether to comment on source (`FROM`) or target (`TO`) version - defaults to `TO`
+- `diffType`: Diff context type (`COMMIT`, `RANGE`, `EFFECTIVE`) - defaults to `EFFECTIVE`
+- `fromHash`: Source commit hash (optional, for COMMIT/RANGE diffType)
+- `toHash`: Target commit hash (optional, for COMMIT/RANGE diffType)
 
 ### `get_diff`
 
@@ -227,6 +238,22 @@ get_pull_request --repository "my-repo" --prId 123
 
 # Merge a pull request with squash strategy
 merge_pull_request --repository "my-repo" --prId 123 --strategy "squash" --message "Feature: New functionality (#123)"
+```
+
+### Working with Comments
+
+```bash
+# Add a general pull request comment
+add_comment --repository "my-repo" --prId 123 --text "Looks good overall!"
+
+# Add an inline comment on a specific line
+add_comment --repository "my-repo" --prId 123 --text "Consider using const instead of let here" --filePath "src/index.ts" --lineNumber 42 --lineType "ADDED"
+
+# Add a comment on a removed line
+add_comment --repository "my-repo" --prId 123 --text "Why was this function removed?" --filePath "src/utils.ts" --lineNumber 15 --lineType "REMOVED" --fileType "FROM"
+
+# Reply to an existing comment
+add_comment --repository "my-repo" --prId 123 --text "Thanks for the feedback!" --parentId 456
 ```
 
 ## Dependencies

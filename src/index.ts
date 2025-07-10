@@ -45,9 +45,21 @@ interface MergeOptions {
   strategy?: 'merge-commit' | 'squash' | 'fast-forward';
 }
 
+interface CommentAnchor {
+  diffType: 'COMMIT' | 'RANGE' | 'EFFECTIVE';
+  line: number;
+  lineType: 'CONTEXT' | 'ADDED' | 'REMOVED';
+  fileType: 'FROM' | 'TO';
+  fromHash?: string;
+  toHash?: string;
+  path: string;
+  srcPath?: string;
+}
+
 interface CommentOptions {
   text: string;
   parentId?: number;
+  anchor?: CommentAnchor;
 }
 
 interface PullRequestInput extends RepositoryParams {
@@ -122,7 +134,7 @@ class BitbucketServer {
     const input = args as Partial<PullRequestInput>;
     return typeof args === 'object' &&
       args !== null &&
-      typeof input.project === 'string' &&
+      (input.project === undefined || typeof input.project === 'string') &&
       typeof input.repository === 'string' &&
       typeof input.title === 'string' &&
       typeof input.sourceBranch === 'string' &&
@@ -226,7 +238,7 @@ class BitbucketServer {
         },
         {
           name: 'add_comment',
-          description: 'Add a comment to a pull request for code review, feedback, questions, or discussion. Use this to provide review feedback, ask questions about specific changes, suggest improvements, or participate in code review discussions. Supports threaded conversations.',
+          description: 'Add a comment to a pull request for code review, feedback, questions, or discussion. Supports both general pull request comments and file line comments. Use this to provide review feedback, ask questions about specific changes, suggest improvements, or participate in code review discussions. Supports threaded conversations and inline file comments.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -234,7 +246,14 @@ class BitbucketServer {
               repository: { type: 'string', description: 'Repository slug containing the pull request.' },
               prId: { type: 'number', description: 'Pull request ID to comment on.' },
               text: { type: 'string', description: 'Comment text content. Supports Markdown formatting for code blocks, links, and emphasis.' },
-              parentId: { type: 'number', description: 'ID of parent comment to reply to. Omit for top-level comments.' }
+              parentId: { type: 'number', description: 'ID of parent comment to reply to. Omit for top-level comments.' },
+              filePath: { type: 'string', description: 'File path for inline file comments. When provided, creates a comment anchored to a specific file.' },
+              lineNumber: { type: 'number', description: 'Line number for inline file comments. Must be provided when filePath is specified.' },
+              lineType: { type: 'string', enum: ['CONTEXT', 'ADDED', 'REMOVED'], description: 'Type of line for inline comments. CONTEXT for unchanged lines, ADDED for added lines, REMOVED for removed lines.' },
+              fileType: { type: 'string', enum: ['FROM', 'TO'], description: 'Whether to comment on the source (FROM) or target (TO) version of the file.' },
+              diffType: { type: 'string', enum: ['COMMIT', 'RANGE', 'EFFECTIVE'], description: 'Type of diff context. EFFECTIVE is most commonly used for pull request comments.' },
+              fromHash: { type: 'string', description: 'Source commit hash for COMMIT or RANGE diffType. Optional for EFFECTIVE diffType.' },
+              toHash: { type: 'string', description: 'Target commit hash for COMMIT or RANGE diffType. Optional for EFFECTIVE diffType.' }
             },
             required: ['repository', 'prId', 'text']
           }
@@ -350,9 +369,36 @@ class BitbucketServer {
               repository: args.repository as string,
               prId: args.prId as number
             };
+            // Build anchor for file line comments if filePath is provided
+            let anchor: CommentAnchor | undefined;
+            if (args.filePath) {
+              if (!args.lineNumber) {
+                throw new McpError(
+                  ErrorCode.InvalidParams,
+                  'lineNumber is required when filePath is provided for file line comments'
+                );
+              }
+              anchor = {
+                diffType: (args.diffType as 'COMMIT' | 'RANGE' | 'EFFECTIVE') || 'EFFECTIVE',
+                line: args.lineNumber as number,
+                lineType: (args.lineType as 'CONTEXT' | 'ADDED' | 'REMOVED') || 'CONTEXT',
+                fileType: (args.fileType as 'FROM' | 'TO') || 'TO',
+                path: args.filePath as string,
+                srcPath: args.filePath as string
+              };
+              
+              if (args.fromHash) {
+                anchor.fromHash = args.fromHash as string;
+              }
+              if (args.toHash) {
+                anchor.toHash = args.toHash as string;
+              }
+            }
+            
             return await this.addComment(commentPrParams, {
               text: args.text as string,
-              parentId: args.parentId as number
+              parentId: args.parentId as number,
+              anchor
             });
           }
 
@@ -576,14 +622,34 @@ class BitbucketServer {
       );
     }
 
-    const { text, parentId } = options;
+    const { text, parentId, anchor } = options;
+
+    const requestBody: {
+      text: string;
+      parent?: { id: number };
+      anchor?: CommentAnchor;
+    } = {
+      text,
+      parent: parentId ? { id: parentId } : undefined
+    };
+
+    // Add anchor for file line comments
+    if (anchor) {
+      requestBody.anchor = {
+        diffType: anchor.diffType,
+        line: anchor.line,
+        lineType: anchor.lineType,
+        fileType: anchor.fileType,
+        path: anchor.path,
+        ...(anchor.fromHash && { fromHash: anchor.fromHash }),
+        ...(anchor.toHash && { toHash: anchor.toHash }),
+        ...(anchor.srcPath && { srcPath: anchor.srcPath })
+      };
+    }
 
     const response = await this.api.post(
       `/projects/${project}/repos/${repository}/pull-requests/${prId}/comments`,
-      {
-        text,
-        parent: parentId ? { id: parentId } : undefined
-      }
+      requestBody
     );
 
     return {
@@ -644,8 +710,14 @@ class BitbucketServer {
   }
 }
 
-const server = new BitbucketServer();
-server.run().catch((error) => {
-  logger.error('Server error', error);
-  process.exit(1);
-});
+// Only run the server if this module is executed directly (not imported/required)
+if (require.main === module) {
+  const server = new BitbucketServer();
+  server.run().catch((error) => {
+    logger.error('Server error', error);
+    process.exit(1);
+  });
+}
+
+// Export for testing
+export { BitbucketServer };
