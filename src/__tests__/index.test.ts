@@ -21,10 +21,6 @@ type ToolRequest = {
   arguments: unknown;
 };
 
-type RequestExtra = {
-  signal: AbortSignal;
-};
-
 // Mock Server class
 const MockServer = Server as jest.MockedClass<typeof Server>;
 
@@ -73,6 +69,29 @@ describe('BitbucketServer', () => {
     process.env = originalEnv;
   });
 
+  const mockHandleRequest = async <T>(toolName: string, args: T): Promise<ToolResponse> => {
+    const handlers = mockServer.setRequestHandler.mock.calls;
+    const callHandler = handlers.find(([schema]) => 
+      (schema as { method?: string }).method === 'call_tool'
+    )?.[1];
+    if (!callHandler) throw new Error('Handler not found');
+    
+    const request: ToolRequest = {
+      method: 'call_tool',
+      tool: toolName,
+      arguments: args
+    };
+
+    const extra: any = {
+      signal: mockAbortController.signal,
+      requestId: 'test-request-id',
+      sendNotification: jest.fn(),
+      sendRequest: jest.fn(),
+    };
+
+    return callHandler(request, extra) as Promise<ToolResponse>;
+  };
+
   describe('Configuration', () => {
     test('should throw if BITBUCKET_URL is not defined', () => {
       // Arrange
@@ -112,26 +131,6 @@ describe('BitbucketServer', () => {
   });
 
   describe('Pull Request Operations', () => {
-    const mockHandleRequest = async <T>(toolName: string, args: T): Promise<ToolResponse> => {
-      const handlers = mockServer.setRequestHandler.mock.calls;
-      const callHandler = handlers.find(([schema]) => 
-        (schema as { method?: string }).method === 'call_tool'
-      )?.[1];
-      if (!callHandler) throw new Error('Handler not found');
-      
-      const request: ToolRequest = {
-        method: 'call_tool',
-        tool: toolName,
-        arguments: args
-      };
-
-      const extra: RequestExtra = {
-        signal: mockAbortController.signal
-      };
-
-      return callHandler(request, extra) as Promise<ToolResponse>;
-    };
-
     test('should create a pull request with explicit project', async () => {
       // Arrange
       const input = {
@@ -266,26 +265,6 @@ describe('BitbucketServer', () => {
   });
 
   describe('Reviews and Comments', () => {
-    const mockHandleRequest = async <T>(toolName: string, args: T): Promise<ToolResponse> => {
-      const handlers = mockServer.setRequestHandler.mock.calls;
-      const callHandler = handlers.find(([schema]) => 
-        (schema as { method?: string }).method === 'call_tool'
-      )?.[1];
-      if (!callHandler) throw new Error('Handler not found');
-      
-      const request: ToolRequest = {
-        method: 'call_tool',
-        tool: toolName,
-        arguments: args
-      };
-
-      const extra: RequestExtra = {
-        signal: mockAbortController.signal
-      };
-
-      return callHandler(request, extra) as Promise<ToolResponse>;
-    };
-
     test('should filter review activities', async () => {
       // Arrange
       const input = {
